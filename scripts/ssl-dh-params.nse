@@ -50,9 +50,7 @@ categories = {"discovery", "safe"}
 local DHE_ALGORITHMS = {
 	"DH_anon",
 	"DHE_RSA",
-	"DHE_DSS",
-	"DHE_PSK",
-	"PSK_DHE"
+	"DHE_DSS"
 }
 
 -- Export-grade ephemeral Diffie-Hellman key exchange variants
@@ -401,11 +399,12 @@ local function get_dhe_ciphers()
 	local dhe_exports = {}
 
 	for cipher, _ in pairs(tls.CIPHERS) do
-		local kex = tls.cipher_info(cipher).kex
-		if stdnse.contains(DHE_ALGORITHMS, kex) then
+		local info = tls.cipher_info(cipher)
+		if stdnse.contains(DHE_ALGORITHMS, info.kex) and
+			not info.draft and info.hash ~= "RMD" then
 			dhe_ciphers[#dhe_ciphers + 1] = cipher
 		end
-		if stdnse.contains(DHE_ALGORITHMS_EXPORT, kex) then
+		if stdnse.contains(DHE_ALGORITHMS_EXPORT, info.kex) then
 			dhe_exports[#dhe_exports + 1] = cipher
 		end
 	end
