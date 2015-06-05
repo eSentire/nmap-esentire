@@ -71,12 +71,15 @@ local function fromhex(hexstr)
 end
 
 -- Common Diffie-Hellman primes
--- The primes from weakdh.org were harvest by:
--- 		1) Scanning the IPv4 space 
---		2) Scanning Alexa Top 1 million (seen >100 times)
+--
+-- The primes from weakdh.org were harvested by:
+--    1) Scanning the IPv4 space 
+--    2) Scanning Alexa Top 1 million (seen >100 times)
+--
 -- The list from weakdh.org overlaps the original script source code, therefore those were removed. 
--- The primes were not searchable on Google (hope for source code match) - they may belong to closed source software.
--- If someone happens to find / match it, send pull request. The numbers #1, #2 are used as reference *only*
+-- The primes were not searchable on Google (hope for source code match) - they may belong to closed
+-- source software. If someone happens to find/match it, send a pull request. The numbers #1, #2 are
+-- used as reference *only*.
 local DHE_PRIMES = {
   ["mod_ssl 2.0.x/Hardcoded 512-bit prime"] = fromhex([[
     D4BCD524 06F69B35 994B88DE 5DB89682 C8157F62 D8F33633 EE5772F1 1F05AB22
@@ -256,17 +259,6 @@ local DHE_PRIMES = {
     15987D9A DC0A486D CDF93ACC 44328387 315D75E1 98C641A4 80CD86A1 B9E587E8
     BE60E69C C928B2B9 C52172E4 13042E9B 23F10B0E 16E79763 C9B53DCF 4BA80A29
     E3FB73C1 6B8E75B9 7EF363E2 FFA31F71 CF9DE538 4E71B81C 0AC4DFFE 0C10E64F
-  ]]),
-
-  ["RFC5114/2048-bit MODP Group with 256-bit Prime Order Subgroup"] = fromhex([[
-    87A8E61D B4B6663C FFBBD19C 65195999 8CEEF608 660DD0F2 5D2CEED4 435E3B00
-    E00DF8F1 D61957D4 FAF7DF45 61B2AA30 16C3D911 34096FAA 3BF4296D 830E9A7C
-    209E0C64 97517ABD 5A8A9D30 6BCF67ED 91F9E672 5B4758C0 22E0B1EF 4275BF7B
-    6C5BFC11 D45F9088 B941F54E B1E59BB8 BC39A0BF 12307F5C 4FDB70C5 81B23F76
-    B63ACAE1 CAA6B790 2D525267 35488A0E F13C6D9A 51BFA4AB 3AD83477 96524D8E
-    F6A167B5 A41825D9 67E144E5 14056425 1CCACB83 E6B486F6 B3CA3F79 71506026
-    C0B857F6 89962856 DED4010A BD0BE621 C3A3960A 54E710C3 75F26375 D7014103
-    A4B54330 C198AF12 6116D227 6E11715F 693877FA D7EF09CA DB094AE9 1E1A1597
   ]]),
 
   ["RFC5114/2048-bit MODP Group with 256-bit Prime Order Subgroup"] = fromhex([[
