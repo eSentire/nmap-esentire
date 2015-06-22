@@ -5,6 +5,7 @@ local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
 local tls = require "tls"
+local vulns = require "vulns"
 
 description = [[
 Discovery of ephemeral Diffie-Hellman parameters for SSL/TLS services.
@@ -25,25 +26,47 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- @output
 -- Host script results:
 -- | ssl-dh-params: 
--- |   LOGJAM: Vulnerable to DH precomputation attacks!
--- |   MODP PRIME #1: 
--- |     Source: mod_ssl 2.2.x/Hardcoded 512-bit prime
--- |     Length: 512 bits
--- |     Value: 
--- |       9fdb8b8a004544f0045f1737d0ba2e0b274cdf1a9f588218fb435316a16e3741
--- |       71fd19d8d8f37c39bf863fd60e3e300680a3030c6e4c3757d08f70e6aa871033
--- |   MODP PRIME #2: 
--- |     Source: mod_ssl 2.2.x/Hardcoded 1024-bit prime
--- |     Length: 1024 bits
--- |     Value: 
--- |       d67de440cbbbdc1936d693d34afd0ad50c84d239a45f520bb88174cb98bce951
--- |       849f912e639c72fb13b4b4d7177e16d55ac179ba420b2a29fe324a467a635e81
--- |       ff5901377beddcfd33168a461aad3b72dae8860078045b07a7dbca7874087d15
--- |_      10ea9fcc9ddd330507dd62db88aeaa747de0f4d6e2bd68b0e7393e0f24218eb3
+-- |   VULNERABLE:
+-- |   Transport Layer Security (TLS) Protocol DHE_EXPORT Ciphers Downgrade MitM (Logjam)
+-- |     State: VULNERABLE
+-- |     IDs:  CVE:CVE-2015-4000  OSVDB:122331
+-- |       The Transport Layer Security (TLS) protocol contains a flaw that is triggered
+-- |       when handling Diffie-Hellman key exchanges defined with the DHE_EXPORT cipher.
+-- |       This may allow a man-in-the-middle attacker to downgrade the security of a TLS
+-- |       session to 512-bit export-grade cryptography, which is significantly weaker,
+-- |       allowing the attacker to more easily break the encryption and monitor or tamper
+-- |       with the encrypted stream.
+-- |     Disclosure date: 2015-5-19
+-- |     Check results:
+-- |       EXPORT DH PRIME 1:
+-- |         Cipher: TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA
+-- |         Source: mod_ssl 2.2.x/Hardcoded 512-bit prime
+-- |         Length: 512
+-- |     References:
+-- |       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4000
+-- |       https://weakdh.org
+-- |       http://osvdb.org/122331
+-- |   
+-- |   Diffie-Hellman Key Exchange Discrete Logarithm Precomputation Vulnerability
+-- |     State: VULNERABLE
+-- |       Transport Layer Security (TLS) services that use one of a few commonly shared
+-- |       Diffie-Hellman groups of insufficient size may be susceptible to passive
+-- |       eavesdropping from an attacker with nation-state resources.
+-- |     Check results:
+-- |       COMMON DH PRIME 1:
+-- |         Cipher: TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA
+-- |         Source: mod_ssl 2.2.x/Hardcoded 512-bit prime
+-- |         Length: 512
+-- |       COMMON DH PRIME 2:
+-- |         Cipher: TLS_DHE_RSA_WITH_DES_CBC_SHA
+-- |         Source: mod_ssl 2.2.x/Hardcoded 1024-bit prime
+-- |         Length: 1024
+-- |     References:
+-- |_      https://weakdh.org
 
 author = "Jacob Gajek"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
-categories = {"discovery", "safe"}
+categories = {"vuln", "safe"}
 
 
 -- Full-strength ephemeral Diffie-Hellman key exchange variants
@@ -76,7 +99,7 @@ end
 --    1) Scanning the IPv4 space 
 --    2) Scanning Alexa Top 1 million (seen >100 times)
 --
--- The list from weakdh.org overlaps the original script source code, therefore those were removed. 
+-- The list from weakDH.org overlaps the original script source code, therefore those were removed. 
 -- The primes were not searchable on Google (hope for source code match) - they may belong to closed
 -- source software. If someone happens to find/match it, send a pull request. The numbers #1, #2 are
 -- used as reference *only*.
@@ -478,7 +501,7 @@ local function get_dhe_params(host, port, protocol, ciphers)
   if cipher and packed then
     local info = tls.cipher_info(cipher)
     local data = tls.KEX_ALGORITHMS[info.kex].server_key_exchange(packed)
-    return data.dhparams
+    return cipher, data.dhparams
   end
 
   return nil
@@ -507,21 +530,42 @@ local function get_dhe_ciphers()
 end
 
 
-local function output_dhprime(response, dhparams, numprime)
-  local dhinfo = stdnse.output_table()
+local function check_dhprime(logjam, common, cipher, dhparams)
+  local source = DHE_PRIMES[dhparams.p]
   local length = #dhparams.p * 8
+  local value = stdnse.strsplit(" ", stdnse.tohex(dhparams.p, {separator = " ", group = 64}))
 
-  dhinfo["Source"] = DHE_PRIMES[dhparams.p] or "Unknown/custom-generated"
-  dhinfo["Length"] = ("%d bits"):format(length)
-
-  value = stdnse.strsplit(" ", stdnse.tohex(dhparams.p, {separator = " ", group = 64}))
-  dhinfo["Value"] = value
-
-  if length <= 512 or (DHE_PRIMES[dhparams.p] and length <= 1024) then
-    response["LOGJAM"] = "Vulnerable to DH precomputation attacks!"
+  function output_prime(prime)
+    return string.format("%s:\n  Cipher: %s\n  Source: %s\n  Length: %s",
+                         prime.Label,
+                         prime.Cipher,
+                         prime.Source,
+                         prime.Length)
   end
 
-  response[("MODP PRIME #%d"):format(numprime)] = dhinfo
+  if length <= 512 then
+    prime = {
+      ["Label"] = ("EXPORT DH PRIME %d"):format(#logjam + 1),
+      ["Cipher"] = cipher,
+      ["Source"] = source or "Unknown/Custom-generated",
+      ["Length"] = length,
+      ["Value"] = value
+    }
+
+    logjam[#logjam + 1] = output_prime(prime)
+  end
+
+  if source and length <= 1024 then
+    prime = {
+      ["Label"] = ("COMMON DH PRIME %d"):format(#common + 1),
+      ["Cipher"] = cipher,
+      ["Source"] = source,
+      ["Length"] = length,
+      ["Value"] = value
+    }
+
+    common[#common + 1] = output_prime(prime)
+  end
 end
 
 
@@ -531,34 +575,79 @@ end
 
 
 action = function(host, port)
-  local response = stdnse.output_table()
   local dhe_ciphers, dhe_exports = get_dhe_ciphers()
+  local cipher
   local dhparams
+  local logjam = {}
+  local common = {}
   local primes = {}
+
+  local vuln_table_logjam = {
+    title = "Transport Layer Security (TLS) Protocol DHE_EXPORT Ciphers Downgrade MitM (Logjam)",
+    description = [[
+The Transport Layer Security (TLS) protocol contains a flaw that is triggered
+when handling Diffie-Hellman key exchanges defined with the DHE_EXPORT cipher.
+This may allow a man-in-the-middle attacker to downgrade the security of a TLS
+session to 512-bit export-grade cryptography, which is significantly weaker,
+allowing the attacker to more easily break the encryption and monitor or tamper
+with the encrypted stream.]],
+    state = vulns.STATE.NOT_VULN,
+    IDS = {
+      CVE = 'CVE-2015-4000',
+      OSVDB = '122331'
+    },
+    SCORES = {
+      CVSSv2 = '4.3'
+    },
+    dates = {
+      disclosure = {
+        year = 2015, month = 5, day = 19
+      }
+    },
+    references = {
+      "https://weakdh.org"
+    }
+  }
+
+  local vuln_table_common = {
+    title = "Diffie-Hellman Key Exchange Discrete Logarithm Precomputation Vulnerability",
+    description = [[
+Transport Layer Security (TLS) services that use one of a few commonly shared
+Diffie-Hellman groups of insufficient size may be susceptible to passive
+eavesdropping from an attacker with nation-state resources.]],
+    state = vulns.STATE.NOT_VULN,
+    references = {
+      "https://weakdh.org"
+    }
+  }
 
   for protocol, _ in pairs(tls.PROTOCOLS) do
     -- Try DHE_EXPORT ciphersuites
-    dhparams = get_dhe_params(host, port, protocol, dhe_exports)
-    if dhparams then
-      if not stdnse.contains(primes, dhparams.p) then
-        primes[#primes + 1] = dhparams.p
-        output_dhprime(response, dhparams, #primes)
-      end
+    cipher, dhparams = get_dhe_params(host, port, protocol, dhe_exports)
+    if dhparams and not primes[dhparams.p] then
+      check_dhprime(logjam, common, cipher, dhparams)
+      primes[dhparams.p] = 1
     end
 
     -- Try non-export DHE ciphersuites
-    dhparams = get_dhe_params(host, port, protocol, dhe_ciphers)
-    if dhparams then
-      if not stdnse.contains(primes, dhparams.p) then
-        primes[#primes + 1] = dhparams.p
-        output_dhprime(response, dhparams, #primes)
-      end
+    cipher, dhparams = get_dhe_params(host, port, protocol, dhe_ciphers)
+    if dhparams and not primes[dhparams.p] then
+      check_dhprime(logjam, common, cipher, dhparams)
+      primes[dhparams.p] = 1
     end
   end
 
-  if #primes > 0 then
-    return response
-  else
-    return "Ephemeral Diffie-Hellman key exchange not accepted"
+  local report = vulns.Report:new(SCRIPT_NAME, host, port)
+
+  if #logjam > 0 then
+    vuln_table_logjam.check_results = logjam
+    vuln_table_logjam.state = vulns.STATE.VULN
   end
+
+  if #common > 0 then
+    vuln_table_common.check_results = common
+    vuln_table_common.state = vulns.STATE.VULN
+  end
+
+  return report:make_output(vuln_table_logjam, vuln_table_common)
 end
