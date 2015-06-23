@@ -478,15 +478,18 @@ local function get_dhe_params(host, port, protocol, ciphers)
     t.extensions.server_name = tls.EXTENSION_HELPERS.server_name(host.targetname)
   end
 
+  -- Keep ClientHello record size below 255 bytes and the number of ciphersuites
+  -- to 64 or less in order to avoid implementation issues with some TLS servers
   local function next_chunk(t, ciphers, pos)
     local len, room, last
+
+    -- Get handshake record size with just one cipher
     t.ciphers = { "TLS_NULL_WITH_NULL_NULL" }
     len = #tls.client_hello(t)
 
-    -- Keep ClientHello record size below 255 bytes and the number of ciphersuites
-    -- to 64 or less in order to avoid implementation issues with some TLS servers
-    room = (255 - len) / 2
-    last = math.min(#ciphers, pos + math.min(63, room - 1))
+    -- Compute number of ciphers to fit in next chunk
+    room = math.floor((255 - len) / 2)
+    last = math.min(#ciphers, pos + math.min(63, room))
     t.ciphers = {}
 
     for i = pos, last do
@@ -516,18 +519,15 @@ local function get_dhe_params(host, port, protocol, ciphers)
         elseif handshake.body[j].type == "server_key_exchange" then
           packed = handshake.body[j].data
         end
-        if cipher and packed then
-          break
-        end
       end
     end
-  end
 
-  -- Unpack and return the DH parameters
-  if cipher and packed then
-    local info = tls.cipher_info(cipher)
-    local data = tls.KEX_ALGORITHMS[info.kex].server_key_exchange(packed)
-    return cipher, data.dhparams
+    -- Only try next chunk if current chunk was rejected
+    if cipher and packed then
+      local info = tls.cipher_info(cipher)
+      local data = tls.KEX_ALGORITHMS[info.kex].server_key_exchange(packed)
+      return cipher, data.dhparams
+    end
   end
 
   return nil
@@ -557,12 +557,9 @@ local function check_dhprime(logjam, common, cipher, dhparams)
   local length = #dhparams.p * 8
   local value = stdnse.strsplit(" ", stdnse.tohex(dhparams.p, {separator = " ", group = 64}))
 
-  function output_prime(prime)
+  local function output_prime(prime)
     return string.format("%s:\n  Cipher: %s\n  Source: %s\n  Length: %s",
-                         prime.Label,
-                         prime.Cipher,
-                         prime.Source,
-                         prime.Length)
+                         prime.Label, prime.Cipher, prime.Source, prime.Length)
   end
 
   if length <= 512 then
@@ -573,7 +570,6 @@ local function check_dhprime(logjam, common, cipher, dhparams)
       ["Length"] = length,
       ["Value"] = value
     }
-
     logjam[#logjam + 1] = output_prime(prime)
   end
 
@@ -585,7 +581,6 @@ local function check_dhprime(logjam, common, cipher, dhparams)
       ["Length"] = length,
       ["Value"] = value
     }
-
     common[#common + 1] = output_prime(prime)
   end
 end
