@@ -3,6 +3,7 @@ local shortport = require "shortport"
 local sslcert = require "sslcert"
 local stdnse = require "stdnse"
 local string = require "string"
+local math = require "math"
 local table = require "table"
 local tls = require "tls"
 local vulns = require "vulns"
@@ -73,7 +74,8 @@ categories = {"vuln", "safe"}
 local DHE_ALGORITHMS = {
   ["DH_anon"] = 1,
   ["DHE_RSA"] = 1,
-  ["DHE_DSS"] = 1
+  ["DHE_DSS"] = 1,
+  ["DHE_PSK"] = 1
 }
 
 -- Export-grade ephemeral Diffie-Hellman key exchange variants
@@ -468,31 +470,55 @@ end
 local function get_dhe_params(host, port, protocol, ciphers)
   local cipher, packed
   local t = {}
+  local pos = 1
   t.protocol = protocol
-  t.ciphers = ciphers
   t.extensions = {}
 
   if host.targetname then
     t.extensions.server_name = tls.EXTENSION_HELPERS.server_name(host.targetname)
   end
 
-  local records = get_server_response(host, port, t)
+  local function next_chunk(t, ciphers, pos)
+    local len, room, last
+    t.ciphers = { "TLS_NULL_WITH_NULL_NULL" }
+    len = #tls.client_hello(t)
 
-  local alert = records.alert
-  if alert then
-    for j = 1, #alert.body do
-      ctx_log(2, protocol, "Received alert: %s", alert.body[j].description)
+    -- Keep ClientHello record size below 255 bytes and the number of ciphersuites
+    -- to 64 or less in order to avoid implementation issues with some TLS servers
+    room = (255 - len) / 2
+    last = math.min(#ciphers, pos + math.min(63, room - 1))
+    t.ciphers = {}
+
+    for i = pos, last do
+      table.insert(t.ciphers, ciphers[i])
     end
+
+    return last + 1
   end
 
-  -- Extract negotiated cipher suite and key exchange data
-  local handshake = records.handshake
-  if handshake then
-    for j = 1, #handshake.body do
-      if handshake.body[j].type == "server_hello" then
-        cipher = handshake.body[j].cipher
-      elseif handshake.body[j].type == "server_key_exchange" then
-        packed = handshake.body[j].data
+  while pos <= #ciphers do
+    pos = next_chunk(t, ciphers, pos)
+    local records = get_server_response(host, port, t)
+
+    local alert = records.alert
+    if alert then
+      for j = 1, #alert.body do
+        ctx_log(2, protocol, "Received alert: %s", alert.body[j].description)
+      end
+    end
+
+    -- Extract negotiated cipher suite and key exchange data
+    local handshake = records.handshake
+    if handshake then
+      for j = 1, #handshake.body do
+        if handshake.body[j].type == "server_hello" then
+          cipher = handshake.body[j].cipher
+        elseif handshake.body[j].type == "server_key_exchange" then
+          packed = handshake.body[j].data
+        end
+        if cipher and packed then
+          break
+        end
       end
     end
   end
@@ -514,11 +540,7 @@ local function get_dhe_ciphers()
 
   for cipher, _ in pairs(tls.CIPHERS) do
     local info = tls.cipher_info(cipher)
-    -- We skip PSK, draft and RMD ciphersuites to keep the ClientHello packet
-    -- size down. Some Windows-based services cannot handle large ClientHello
-    -- packets.
-    if DHE_ALGORITHMS[info.kex] and
-      not info.draft and info.hash ~= "RMD" then
+    if DHE_ALGORITHMS[info.kex] then
       dhe_ciphers[#dhe_ciphers + 1] = cipher
     end
     if DHE_ALGORITHMS_EXPORT[info.kex] then
