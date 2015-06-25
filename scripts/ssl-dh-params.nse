@@ -9,7 +9,7 @@ local tls = require "tls"
 local vulns = require "vulns"
 
 description = [[
-Discovery of ephemeral Diffie-Hellman parameters for SSL/TLS services.
+Weak ephemeral Diffie-Hellman parameter detection for SSL/TLS services.
 
 This script simulates SSL/TLS handshakes using ciphersuites that have ephemeral
 Diffie-Hellman as the key exchange algorithm.
