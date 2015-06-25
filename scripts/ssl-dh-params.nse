@@ -552,15 +552,18 @@ local function get_dhe_ciphers()
 end
 
 
+metatable = {
+  __tostring = 
+    function(p)
+      return string.format("%s\n      Cipher: %s\n      Source: %s\n      Length: %s",
+                           p.Label, p.Cipher, p.Source, p.Length)
+    end
+}
+
+
 local function check_dhprime(logjam, common, cipher, dhparams)
   local source = DHE_PRIMES[dhparams.p]
   local length = #dhparams.p * 8
-  local value = stdnse.strsplit(" ", stdnse.tohex(dhparams.p, {separator = " ", group = 64}))
-
-  local function output_prime(prime)
-    return string.format("%s:\n  Cipher: %s\n  Source: %s\n  Length: %s",
-                         prime.Label, prime.Cipher, prime.Source, prime.Length)
-  end
 
   if length <= 512 then
     prime = {
@@ -568,9 +571,10 @@ local function check_dhprime(logjam, common, cipher, dhparams)
       ["Cipher"] = cipher,
       ["Source"] = source or "Unknown/Custom-generated",
       ["Length"] = length,
-      ["Value"] = value
+      ["Value"] = stdnse.tohex(dhparams.p)
     }
-    logjam[#logjam + 1] = output_prime(prime)
+    setmetatable(prime, metatable)
+    logjam[#logjam + 1] = prime
   end
 
   if source and length <= 1024 then
@@ -579,9 +583,10 @@ local function check_dhprime(logjam, common, cipher, dhparams)
       ["Cipher"] = cipher,
       ["Source"] = source,
       ["Length"] = length,
-      ["Value"] = value
+      ["Value"] = stdnse.tohex(dhparams.p)
     }
-    common[#common + 1] = output_prime(prime)
+    setmetatable(prime, metatable)
+    common[#common + 1] = prime
   end
 end
 
@@ -638,7 +643,7 @@ eavesdropping from an attacker with nation-state resources.]],
     }
   }
 
-  for protocol, _ in pairs(tls.PROTOCOLS) do
+  for protocol in pairs(tls.PROTOCOLS) do
     -- Try DHE_EXPORT ciphersuites
     cipher, dhparams = get_dhe_params(host, port, protocol, dhe_exports)
     if dhparams and not primes[dhparams.p] then
@@ -664,6 +669,7 @@ eavesdropping from an attacker with nation-state resources.]],
   if #common > 0 then
     vuln_table_common.check_results = common
     vuln_table_common.state = vulns.STATE.VULN
+    print(string.format("%s", common))
   end
 
   return report:make_output(vuln_table_logjam, vuln_table_common)
