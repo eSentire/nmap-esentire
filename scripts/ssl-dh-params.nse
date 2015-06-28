@@ -7,6 +7,7 @@ local math = require "math"
 local table = require "table"
 local tls = require "tls"
 local vulns = require "vulns"
+local have_ssl, openssl = pcall(require, "openssl")
 
 description = [[
 Weak ephemeral Diffie-Hellman parameter detection for SSL/TLS services.
@@ -39,7 +40,8 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- |       with the encrypted stream.
 -- |     Disclosure date: 2015-5-19
 -- |     Check results:
--- |       EXPORT DH PRIME 1:
+-- |       EXPORT-GRADE DH MODULUS 1:
+-- |         Class: Safe prime
 -- |         Cipher: TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA
 -- |         Source: mod_ssl 2.2.x/Hardcoded 512-bit prime
 -- |         Length: 512
@@ -54,11 +56,8 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- |       Diffie-Hellman groups of insufficient size may be susceptible to passive
 -- |       eavesdropping from an attacker with nation-state resources.
 -- |     Check results:
--- |       COMMON DH PRIME 1:
--- |         Cipher: TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA
--- |         Source: mod_ssl 2.2.x/Hardcoded 512-bit prime
--- |         Length: 512
--- |       COMMON DH PRIME 2:
+-- |       WELL-KNOWN DH MODULUS 1:
+-- |         Class: Safe prime
 -- |         Cipher: TLS_DHE_RSA_WITH_DES_CBC_SHA
 -- |         Source: mod_ssl 2.2.x/Hardcoded 1024-bit prime
 -- |         Length: 1024
@@ -552,41 +551,55 @@ local function get_dhe_ciphers()
 end
 
 
-metatable = {
-  __tostring = 
-    function(p)
-      return string.format("%s\n      Cipher: %s\n      Source: %s\n      Length: %s",
-                           p.Label, p.Cipher, p.Source, p.Length)
-    end
-}
+if have_ssl then
+  metatable = {
+    __tostring = 
+      function(p)
+        return string.format("%s\n      Class: %s\n      Cipher: %s\n      Source: %s\n      Length: %s bits",
+                             p.Label, p.Class, p.Cipher, p.Source, p.Length)
+      end
+  }
+else
+  metatable = {
+    __tostring =
+      function(p)
+        return string.format("%s\n      Cipher: %s\n      Source: %s\n      Length: %s bits",
+                             p.Label, p.Cipher, p.Source, p.Length)
+      end
+  }
+end
 
 
 local function check_dhprime(logjam, common, cipher, dhparams)
   local source = DHE_PRIMES[dhparams.p]
   local length = #dhparams.p * 8
+  local value = stdnse.tohex(dhparams.p)
+  local base = stdnse.tohex(dhparams.g)
 
-  if length <= 512 then
-    prime = {
-      ["Label"] = ("EXPORT DH PRIME %d"):format(#logjam + 1),
-      ["Cipher"] = cipher,
-      ["Source"] = source or "Unknown/Custom-generated",
-      ["Length"] = length,
-      ["Value"] = stdnse.tohex(dhparams.p)
-    }
-    setmetatable(prime, metatable)
-    logjam[#logjam + 1] = prime
+  local modulus = {
+    ["Cipher"] = cipher,
+    ["Source"] = source or "Unknown/Custom-generated",
+    ["Length"] = length,
+    ["Value"] = value,
+    ["Base"] = base
+  }
+
+  if have_ssl then
+    local bn = openssl.bignum_bin2bn(dhparams.p)
+    local is_prime, is_safe = openssl.bignum_is_safe_prime(bn)
+    modulus["Class"] = (is_safe and "Safe prime") or
+                       (is_prime and "Non-safe prime") or
+                       "Composite"
   end
 
-  if source and length <= 1024 then
-    prime = {
-      ["Label"] = ("COMMON DH PRIME %d"):format(#common + 1),
-      ["Cipher"] = cipher,
-      ["Source"] = source,
-      ["Length"] = length,
-      ["Value"] = stdnse.tohex(dhparams.p)
-    }
-    setmetatable(prime, metatable)
-    common[#common + 1] = prime
+  if length <= 512 then
+    modulus["Label"] = ("EXPORT-GRADE DH MODULUS %d"):format(#logjam + 1)
+    setmetatable(modulus, metatable)
+    logjam[#logjam + 1] = modulus
+  elseif source and length <= 1024 then
+    modulus["Label"] = ("WELL-KNOWN DH MODULUS %d"):format(#common + 1)
+    setmetatable(modulus, metatable)
+    common[#common + 1] = modulus
   end
 end
 
@@ -669,8 +682,10 @@ eavesdropping from an attacker with nation-state resources.]],
   if #common > 0 then
     vuln_table_common.check_results = common
     vuln_table_common.state = vulns.STATE.VULN
-    print(string.format("%s", common))
   end
 
-  return report:make_output(vuln_table_logjam, vuln_table_common)
+  report:add_vulns(vuln_table_logjam)
+  report:add_vulns(vuln_table_common)
+
+  return report:make_output()
 end
