@@ -10,7 +10,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 
 ### Usage:
 
-`nmap --script path/to/ssl-dh-params <target>`
+`nmap --script ssl-dh-params <target>`
 
 ### Sample output:
 
@@ -19,7 +19,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 |   VULNERABLE:
 |   Transport Layer Security (TLS) Protocol DHE_EXPORT Ciphers Downgrade MitM (Logjam)
 |     State: VULNERABLE
-|     IDs:  CVE:CVE-2015-4000  OSVDB:122331
+|     IDs:  OSVDB:122331  CVE:CVE-2015-4000
 |       The Transport Layer Security (TLS) protocol contains a flaw that is triggered
 |       when handling Diffie-Hellman key exchanges defined with the DHE_EXPORT cipher.
 |       This may allow a man-in-the-middle attacker to downgrade the security of a TLS
@@ -28,14 +28,16 @@ Opportunistic STARTTLS sessions are established on services that support them.
 |       with the encrypted stream.
 |     Disclosure date: 2015-5-19
 |     Check results:
-|       EXPORT-GRADE DH MODULUS 1:
-|         Class: Safe prime
-|         Cipher: TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA
-|         Source: mod_ssl 2.2.x/Hardcoded 512-bit prime
-|         Length: 512
+|       EXPORT-GRADE DH GROUP 1
+|         Ciphersuite: TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA
+|         Modulus Type: Non-safe prime
+|         Modulus Source: sun.security.provider/512-bit DSA group with 160-bit prime order subgroup
+|         Modulus Length: 512 bits
+|         Generator Length: 512 bits
+|         Public Key Length: 512 bits
 |     References:
-|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4000
 |       https://weakdh.org
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4000
 |       http://osvdb.org/122331
 |   
 |   Diffie-Hellman Key Exchange Discrete Logarithm Precomputation Vulnerability
@@ -44,11 +46,13 @@ Opportunistic STARTTLS sessions are established on services that support them.
 |       Diffie-Hellman groups of insufficient size may be susceptible to passive
 |       eavesdropping from an attacker with nation-state resources.
 |     Check results:
-|       WELL-KNOWN DH MODULUS 1:
-|         Class: Safe prime
-|         Cipher: TLS_DHE_RSA_WITH_DES_CBC_SHA
-|         Source: mod_ssl 2.2.x/Hardcoded 1024-bit prime
-|         Length: 1024
+|       WELL-KNOWN DH GROUP 1
+|         Ciphersuite: TLS_DHE_RSA_WITH_DES_CBC_SHA
+|         Modulus Type: Non-safe prime
+|         Modulus Source: sun.security.provider/768-bit DSA group with 160-bit prime order subgroup
+|         Modulus Length: 768 bits
+|         Generator Length: 768 bits
+|         Public Key Length: 768 bits
 |     References:
 |_      https://weakdh.org
 ```
