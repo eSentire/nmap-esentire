@@ -1,6 +1,6 @@
 Index: tls.lua
 ===================================================================
---- tls.lua	(revision 34821)
+--- tls.lua	(revision 34822)
 +++ tls.lua	(working copy)
 @@ -1107,12 +1107,14 @@
  
@@ -50,17 +50,29 @@ Index: tls.lua
      if h["type"] == "alert" then
        -- Parse body.
        j, b["level"] = bin.unpack("C", buffer, j)
-@@ -1168,6 +1177,8 @@
+@@ -1168,7 +1177,16 @@
        -- Convert to human-readable form.
        b["level"] = find_key(TLS_ALERT_LEVELS, b["level"])
        b["description"] = find_key(TLS_ALERT_REGISTRY, b["description"])
 +
 +      table.insert(h["body"], b)
      elseif h["type"] == "handshake" then
++
++			-- Check for message fragmentation.
++			if len - j < 3 then
++				h.fragment = buffer:sub(j, len)
++				return len + 1 - add, h
++			end
++
        -- Parse body.
        j, b["type"] = bin.unpack("C", buffer, j)
-@@ -1178,6 +1189,12 @@
-       -- Convert to human-readable form.
+       local msg_end
+@@ -1175,9 +1193,15 @@
+       j, msg_end = unpack_3byte(buffer, j)
+       msg_end = msg_end + j
+ 
+-      -- Convert to human-readable form.
++			-- Convert to human-readable form.
        b["type"] = find_key(TLS_HANDSHAKETYPE_REGISTRY, b["type"])
  
 +      -- Check for message fragmentation.
@@ -72,7 +84,7 @@ Index: tls.lua
        if b["type"] == "server_hello" then
          -- Parse body.
          j, b["protocol"] = bin.unpack(">S", buffer, j)
-@@ -1225,9 +1242,12 @@
+@@ -1225,9 +1249,12 @@
          stdnse.debug2("Unknown handshake message type: %s", b["type"])
          j, b["data"] = bin.unpack("A" .. msg_end - j, buffer, j)
        end
@@ -85,9 +97,12 @@ Index: tls.lua
      else
        stdnse.debug1("Unknown message type: %s", h["type"])
      end
-@@ -1236,7 +1256,7 @@
+@@ -1234,9 +1261,9 @@
+   end
+ 
    -- Ignore unparsed bytes.
-   j = len+1
+-  j = len+1
++  j = len + 1
  
 -  return j, h
 +  return j - add, h
