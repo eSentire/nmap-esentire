@@ -95,7 +95,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 |       for the additional properties required for security), this configuration could
 |       be exploited by an attacker to recover the encryption keys for any session.
 |     Check results:
-|       WEAK DH GROUP 1
+|       NON-SAFE DH GROUP 1
 |         Cipher Suite: TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
 |         Modulus Type: Non-safe prime
 |         Modulus Source: Unknown/Custom-generated

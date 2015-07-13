@@ -806,7 +806,7 @@ with the encrypted stream.]],
   }
 
   local vuln_table_weakdh = {
-    title = "Diffie-Hellman Key Exchange Insufficient Group Strength Vulnerability",
+    title = "Diffie-Hellman Key Exchange Insufficient Group Strength",
     description = [[
 Transport Layer Security (TLS) services that use Diffie-Hellman groups of
 insufficient strength, especially those using one of a few commonly shared
