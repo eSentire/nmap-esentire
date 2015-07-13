@@ -3,8 +3,8 @@
 This script simulates SSL/TLS handshakes using ciphersuites that have ephemeral
 Diffie-Hellman as the key exchange algorithm.
 
-Diffie-Hellman MODP group parameters are extracted and analyzed for use of common
-primes and vulnerability to LOGJAM precomputation attacks.
+Diffie-Hellman MODP group parameters are extracted and analyzed for vulnerability
+to Logjam (CVE 2015-4000) and other weaknesses.
 
 Opportunistic STARTTLS sessions are established on services that support them.
 
@@ -14,6 +14,30 @@ Opportunistic STARTTLS sessions are established on services that support them.
 
 ### Sample output:
 
+#### Anonymous Diffie-Hellman Key Exchange MitM Vulnerability
+```
+| ssl-dh-params: 
+|   VULNERABLE:
+|   Anonymous Diffie-Hellman Key Exchange MitM Vulnerability
+|     State: VULNERABLE
+|       Transport Layer Security (TLS) services that use anonymous Diffie-Hellman
+|       key exchange only provide protection against passive eavesdropping, and
+|       are vulnerable to active man-in-the-middle attacks which could completely
+|       compromise the confidentiality and integrity of any data exchanged over
+|       the resulting session.
+|     Check results:
+|       ANONYMOUS DH GROUP 1
+|         Cipher Suite: TLS_DH_anon_WITH_AES_256_CBC_SHA
+|         Modulus Type: Safe prime
+|         Modulus Source: Unknown/Custom-generated
+|         Modulus Length: 512 bits
+|         Generator Length: 8 bits
+|         Public Key Length: 512 bits
+|     References:
+|       https://www.ietf.org/rfc/rfc2246.txt
+```
+
+#### Logjam MitM Vulnerability (CVE 2015-4000)
 ```
 | ssl-dh-params: 
 |   VULNERABLE:
@@ -39,22 +63,47 @@ Opportunistic STARTTLS sessions are established on services that support them.
 |       https://weakdh.org
 |       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4000
 |       http://osvdb.org/122331
-|   
-|   Diffie-Hellman Key Exchange Discrete Logarithm Precomputation Vulnerability
+```
+
+#### Insufficient Diffie-Hellman Group Strength
+```
+|   Diffie-Hellman Key Exchange Insufficient Group Strength
 |     State: VULNERABLE
-|       Transport Layer Security (TLS) services that use one of a few commonly shared
-|       Diffie-Hellman groups of insufficient size may be susceptible to passive
-|       eavesdropping from an attacker with nation-state resources.
+|       Transport Layer Security (TLS) services that use Diffie-Hellman groups of
+|       insufficient strength, especially those using one of a few commonly shared
+|       groups, may be susceptible to passive eavesdropping attacks.
 |     Check results:
-|       WELL-KNOWN DH GROUP 1
-|         Ciphersuite: TLS_DHE_RSA_WITH_DES_CBC_SHA
-|         Modulus Type: Non-safe prime
-|         Modulus Source: sun.security.provider/768-bit DSA group with 160-bit prime order subgroup
-|         Modulus Length: 768 bits
-|         Generator Length: 768 bits
-|         Public Key Length: 768 bits
+|       WEAK DH GROUP 1
+|         Cipher Suite: TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+|         Modulus Type: Safe prime
+|         Modulus Source: Unknown/Custom-generated
+|         Modulus Length: 512 bits
+|         Generator Length: 8 bits
+|         Public Key Length: 512 bits
 |     References:
-|_      https://weakdh.org
+|       https://weakdh.org
+```
+
+#### Incorrectly Generated Diffie-Hellman Group Parameters
+```
+|   Diffie-Hellman Key Exchange Incorrectly Generated Group Parameters
+|     State: VULNERABLE
+|       This TLS service appears to be using non-safe group parameters that do not
+|       correspond to any well-known DSA group for Diffie-Hellman key exchange. If the
+|       parameters were not generated according to the procedure described in FIPS 186
+|       (for example, if the group parameters were randomly generated without checking
+|       for the additional properties required for security), this configuration could
+|       be exploited by an attacker to recover the encryption keys for any session.
+|     Check results:
+|       WEAK DH GROUP 1
+|         Cipher Suite: TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+|         Modulus Type: Non-safe prime
+|         Modulus Source: Unknown/Custom-generated
+|         Modulus Length: 1024 bits
+|         Generator Length: 1024 bits
+|         Public Key Length: 1024 bits
+|     References:
+|       https://weakdh.org
 ```
 
 Depends on NSE library code currently available only in the development version

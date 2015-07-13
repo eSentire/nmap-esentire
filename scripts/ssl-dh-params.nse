@@ -15,8 +15,8 @@ Weak ephemeral Diffie-Hellman parameter detection for SSL/TLS services.
 This script simulates SSL/TLS handshakes using ciphersuites that have ephemeral
 Diffie-Hellman as the key exchange algorithm.
 
-Diffie-Hellman MODP group parameters are extracted and analyzed for use of common
-primes and vulnerability to LOGJAM precomputation attacks.
+Diffie-Hellman MODP group parameters are extracted and analyzed for vulnerability
+to Logjam (CVE 2015-4000) and other weaknesses.
 
 Opportunistic STARTTLS sessions are established on services that support them.
 ]]
@@ -73,9 +73,14 @@ license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 categories = {"vuln", "safe"}
 
 
+-- Anonymous Diffie-Hellman key exchange variants
+local DH_anon_ALGORITHMS = {
+  ["DH_anon_EXPORT"] = 1,
+  ["DH_anon"] = 1
+}
+
 -- Full-strength ephemeral Diffie-Hellman key exchange variants
 local DHE_ALGORITHMS = {
-  ["DH_anon"] = 1,
   ["DHE_RSA"] = 1,
   ["DHE_DSS"] = 1,
   ["DHE_PSK"] = 1
@@ -83,7 +88,6 @@ local DHE_ALGORITHMS = {
 
 -- Export-grade ephemeral Diffie-Hellman key exchange variants
 local DHE_ALGORITHMS_EXPORT = {
-  ["DH_anon_EXPORT"] = 1,
   ["DHE_RSA_EXPORT"] = 1,
   ["DHE_DSS_EXPORT"] = 1,
   ["DHE_DSS_EXPORT1024"] = 1
@@ -643,11 +647,15 @@ end
 
 
 local function get_dhe_ciphers()
+  local dh_anons = {}
   local dhe_ciphers = {}
   local dhe_exports = {}
 
   for cipher, _ in pairs(tls.CIPHERS) do
     local info = tls.cipher_info(cipher)
+    if DH_anon_ALGORITHMS[info.kex] then
+      dh_anons[#dh_anons + 1] = cipher
+    end
     if DHE_ALGORITHMS[info.kex] then
       dhe_ciphers[#dhe_ciphers + 1] = cipher
     end
@@ -656,7 +664,7 @@ local function get_dhe_ciphers()
     end
   end
 
-  return dhe_ciphers, dhe_exports
+  return dh_anons, dhe_ciphers, dhe_exports
 end
 
 
@@ -664,69 +672,78 @@ if have_ssl then
   metatable = {
     __tostring = 
       function(g)
-        return string.format("%s\n      Ciphersuite: %s\n      Modulus Type: " ..
+        return string.format("%s\n      Cipher Suite: %s\n      Modulus Type: " ..
                              "%s\n      Modulus Source: %s\n      Modulus Length: " ..
                              "%s bits\n      Generator Length: %s bits\n      " ..
                              "Public Key Length: %s bits",
-                             g.Label, g.Cipher, g.Class, g.Source, g.Length, g.BaseLen, g.PubKeyLen)
+                             g.Label, g.Cipher, g.Class, g.Source, g.Length, g.GenLen, g.PubKeyLen)
       end
   }
 else
   metatable = {
     __tostring =
       function(g)
-        return string.format("%s\n      Ciphersuite: %s\n      Modulus Source: " ..
+        return string.format("%s\n      Cipher Suite: %s\n      Modulus Source: " ..
                              "%s\n      Modulus Length: %s bits\n      Generator " ..
                              "Length: %s bits\n      Public Key Length: %s bits",
-                             g.Label, g.Cipher, g.Source, g.Length, g.BaseLen, g.PubKeyLen)
+                             g.Label, g.Cipher, g.Source, g.Length, g.GenLen, g.PubKeyLen)
       end
   }
 end
 
 
-local function check_dhgroup(logjam, common, baddsa, cipher, dhparams)
+local function check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
   local source = DHE_PRIMES[dhparams.p]
   local length = #dhparams.p * 8
-  local baselen = #dhparams.g * 8
+  local genlen = #dhparams.g * 8
   local pubkeylen = #dhparams.y * 8
   local modulus = stdnse.tohex(dhparams.p)
-  local base = stdnse.tohex(dhparams.g)
+  local generator = stdnse.tohex(dhparams.g)
   local pubkey = stdnse.tohex(dhparams.y)
+  local is_prime, is_safe
 
   local group = {
     ["Cipher"] = cipher,
     ["Source"] = source or "Unknown/Custom-generated",
     ["Length"] = length,
     ["Modulus"] = modulus,
-    ["BaseLen"] = baselen,
-    ["Base"] = base,
+    ["GenLen"] = genlen,
+    ["Generator"] = generator,
     ["PubKeyLen"] = pubkeylen
   }
 
   if have_ssl then
     local bn = openssl.bignum_bin2bn(dhparams.p)
-    local is_prime, is_safe = openssl.bignum_is_safe_prime(bn)
+    is_prime, is_safe = openssl.bignum_is_safe_prime(bn)
     group["Class"] = (is_safe and "Safe prime") or
                      (is_prime and "Non-safe prime") or
                      "Composite"
   end
 
-  if length <= 512 then
+  if string.find(cipher, "DH_anon") then
+    group["Label"] = ("ANONYMOUS DH GROUP %d"):format(#anondh + 1)
+    setmetatable(group, metatable)
+    anondh[#anondh + 1] = group
+  elseif string.find(cipher, "EXPORT") then
     group["Label"] = ("EXPORT-GRADE DH GROUP %d"):format(#logjam + 1)
     setmetatable(group, metatable)
     logjam[#logjam + 1] = group
-  elseif source and length <= 1024 then
-    group["Label"] = ("WELL-KNOWN DH GROUP %d"):format(#common + 1)
+  elseif length <= 1024 then
+    group["Label"] = ("WEAK DH GROUP %d"):format(#weakdh + 1)
     setmetatable(group, metatable)
-    common[#common + 1] = group
+    weakdh[#weakdh + 1] = group
   end
 
   -- The use of non-safe primes requires carefully generated parameters
   -- in order to be secure. Do some rudimentary validation checks here.
-  if DSA_PARAMS[dhparams.p] and DSA_PARAMS[dhparams.p] ~= dhparams.g then
-    group["Label"] = ("DSA PARAMETER GROUP %d"):format(#baddsa + 1)
+  if have_ssl and not is_safe and not DSA_PARAMS[dhparams.p] then
+    group["Label"] = ("NON-SAFE GROUP %d"):format(#nosafe + 1)
     setmetatable(group, metatable)
-    baddsa[#baddsa + 1] = group
+    nosafe[#nosafe + 1] = group
+  elseif DSA_PARAMS[dhparams.p] and DSA_PARAMS[dhparams.p] ~= dhparams.g then
+    group["Label"] = ("NON-SAFE GROUP %d"):format(#nosafe + 1)
+    setmetatable(group, metatable)
+    nosafe[#nosafe + 1] = group
   end
 end
 
@@ -737,13 +754,29 @@ end
 
 
 action = function(host, port)
-  local dhe_ciphers, dhe_exports = get_dhe_ciphers()
+  local dh_anons, dhe_ciphers, dhe_exports = get_dhe_ciphers()
   local cipher
   local dhparams
+  local anondh = {}
   local logjam = {}
-  local common = {}
-  local baddsa = {}
+  local weakdh = {}
+  local nosafe = {}
   local primes = {}
+  local anons = {}
+
+  local vuln_table_anondh = {
+    title = "Anonymous Diffie-Hellman Key Exchange MitM Vulnerability",
+    description = [[
+Transport Layer Security (TLS) services that use anonymous Diffie-Hellman
+key exchange only provide protection against passive eavesdropping, and
+are vulnerable to active man-in-the-middle attacks which could completely
+compromise the confidentiality and integrity of any data exchanged over
+the resulting session.]],
+    state = vulns.STATE.NOT_VULN,
+    references = {
+      "https://www.ietf.org/rfc/rfc2246.txt"
+    }
+  }
 
   local vuln_table_logjam = {
     title = "Transport Layer Security (TLS) Protocol DHE_EXPORT Ciphers Downgrade MitM (Logjam)",
@@ -772,25 +805,27 @@ with the encrypted stream.]],
     }
   }
 
-  local vuln_table_common = {
-    title = "Diffie-Hellman Key Exchange Discrete Logarithm Precomputation Vulnerability",
+  local vuln_table_weakdh = {
+    title = "Diffie-Hellman Key Exchange Insufficient Group Strength Vulnerability",
     description = [[
-Transport Layer Security (TLS) services that use one of a few commonly shared
-Diffie-Hellman groups of insufficient size may be susceptible to passive
-eavesdropping from an attacker with nation-state resources.]],
+Transport Layer Security (TLS) services that use Diffie-Hellman groups of
+insufficient strength, especially those using one of a few commonly shared
+groups, may be susceptible to passive eavesdropping attacks.]],
     state = vulns.STATE.NOT_VULN,
     references = {
       "https://weakdh.org"
     }
   }
 
-  local vuln_table_baddsa = {
-    title = "Diffie-Hellman Key Exchange DSA Group Parameter Misconfiguration",
+  local vuln_table_nosafe = {
+    title = "Diffie-Hellman Key Exchange Incorrectly Generated Group Parameters",
     description = [[
-This TLS service uses a well-known DSA prime without the corresponding well-known
-DSA generator value. This is likely a misconfiguration which could be exploited
-by a sophisticated attacker to more easily break the encryption or tamper with
-the encrypted stream.]],
+This TLS service appears to be using non-safe group parameters that do not
+correspond to any well-known DSA group for Diffie-Hellman key exchange. If the
+parameters were not generated according to the procedure described in FIPS 186
+(for example, if the group parameters were randomly generated without checking
+for the additional properties required for security), this configuration could
+be exploited by an attacker to recover the encryption keys for any session.]],
     state = vulns.STATE.NOT_VULN,
     references = {
       "https://weakdh.org"
@@ -798,38 +833,51 @@ the encrypted stream.]],
   }
 
   for protocol in pairs(tls.PROTOCOLS) do
+    -- Try anonymous DH ciphersuites
+    cipher, dhparams = get_dhe_params(host, port, protocol, dh_anons)
+    if dhparams and not anons[dhparams.p] then
+      vuln_table_anondh.state = vulns.STATE.VULN
+      check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
+      anons[dhparams.p] = 1
+    end
+
     -- Try DHE_EXPORT ciphersuites
     cipher, dhparams = get_dhe_params(host, port, protocol, dhe_exports)
     if dhparams and not primes[dhparams.p] then
-      check_dhgroup(logjam, common, baddsa, cipher, dhparams)
+      check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
       primes[dhparams.p] = 1
     end
 
     -- Try non-export DHE ciphersuites
     cipher, dhparams = get_dhe_params(host, port, protocol, dhe_ciphers)
     if dhparams and not primes[dhparams.p] then
-      check_dhgroup(logjam, common, baddsa, cipher, dhparams)
+      check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
       primes[dhparams.p] = 1
     end
   end
 
   local report = vulns.Report:new(SCRIPT_NAME, host, port)
 
+  vuln_table_anondh.check_results = anondh
   vuln_table_logjam.check_results = logjam
-  vuln_table_common.check_results = common
-  vuln_table_baddsa.check_results = baddsa
+  vuln_table_weakdh.check_results = weakdh
+  vuln_table_nosafe.check_results = nosafe
+
+  if #anondh > 0 then
+    vuln_table_anondh.state = vulns.STATE.VULN
+  end
 
   if #logjam > 0 then
     vuln_table_logjam.state = vulns.STATE.VULN
   end
 
-  if #common > 0 then
-    vuln_table_common.state = vulns.STATE.VULN
+  if #weakdh > 0 then
+    vuln_table_weakdh.state = vulns.STATE.VULN
   end
 
-  if #baddsa > 0 then
-    vuln_table_baddsa.state = vulns.STATE.LIKELY_VULN
+  if #nosafe > 0 then
+    vuln_table_nosafe.state = vulns.STATE.LIKELY_VULN
   end
 
-  return report:make_output(vuln_table_logjam, vuln_table_common, vuln_table_baddsa)
+  return report:make_output(vuln_table_anondh, vuln_table_logjam, vuln_table_weakdh, vuln_table_nosafe)
 end
