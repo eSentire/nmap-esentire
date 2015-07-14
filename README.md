@@ -87,7 +87,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 #### Incorrectly Generated Diffie-Hellman Group Parameters
 ```
 |   Diffie-Hellman Key Exchange Incorrectly Generated Group Parameters
-|     State: VULNERABLE
+|     State: LIKELY VULNERABLE
 |       This TLS service appears to be using non-safe group parameters that do not
 |       correspond to any well-known DSA group for Diffie-Hellman key exchange. If the
 |       parameters were not generated according to the procedure described in FIPS 186
