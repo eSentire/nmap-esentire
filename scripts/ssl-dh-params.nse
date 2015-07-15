@@ -820,12 +820,13 @@ groups, may be susceptible to passive eavesdropping attacks.]],
   local vuln_table_nosafe = {
     title = "Diffie-Hellman Key Exchange Incorrectly Generated Group Parameters",
     description = [[
-This TLS service appears to be using non-safe group parameters that do not
-correspond to any well-known DSA group for Diffie-Hellman key exchange. If the
-parameters were not generated according to the procedure described in FIPS 186
-(for example, if the group parameters were randomly generated without checking
-for the additional properties required for security), this configuration could
-be exploited by an attacker to recover the encryption keys for any session.]],
+This TLS service appears to be using a modulus that is not a safe prime and does
+not correspond to any well-known DSA group for Diffie-Hellman key exchange.
+These parameters MAY be secure if:
+- They were generated according to the procedure described in FIPS 186-4 for
+  DSA Domain Parameter Generation, or
+- The generator g generates a subgroup of large prime order
+Additional testing may be required to verify the security of these parameters.]],
     state = vulns.STATE.NOT_VULN,
     references = {
       "https://weakdh.org"

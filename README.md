@@ -84,16 +84,17 @@ Opportunistic STARTTLS sessions are established on services that support them.
 |       https://weakdh.org
 ```
 
-#### Incorrectly Generated Diffie-Hellman Group Parameters
+#### Potentially Unsafe Diffie-Hellman Group Parameters
 ```
-|   Diffie-Hellman Key Exchange Incorrectly Generated Group Parameters
+|   Diffie-Hellman Key Exchange Potentially Unsafe Group Parameters
 |     State: LIKELY VULNERABLE
-|       This TLS service appears to be using non-safe group parameters that do not
-|       correspond to any well-known DSA group for Diffie-Hellman key exchange. If the
-|       parameters were not generated according to the procedure described in FIPS 186
-|       (for example, if the group parameters were randomly generated without checking
-|       for the additional properties required for security), this configuration could
-|       be exploited by an attacker to recover the encryption keys for any session.
+|       This TLS service appears to be using a modulus that is not a safe prime and does
+|       not correspond to any well-known DSA group for Diffie-Hellman key exchange.
+|       These parameters MAY be secure if:
+|       - They were generated according to the procedure described in FIPS 186-4 for
+|         DSA Domain Parameter Generation, or
+|       - The generator g generates a subgroup of large prime order
+|       Additional testing may be required to verify the security of these parameters.
 |     Check results:
 |       NON-SAFE DH GROUP 1
 |         Cipher Suite: TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
@@ -109,4 +110,48 @@ Opportunistic STARTTLS sessions are established on services that support them.
 Depends on NSE library code currently available only in the development version
 of Nmap, which can be obtained by cloning and compiling the Subversion repository
 at https://svn.nmap.org/nmap.
+
+### Installation Instructions for Ubuntu Linux:
+
+NOTE: This installation procedure will be updated once the script is included
+in Nmap's standard script collection.
+
+Install dependencies (if required):
+```
+sudo apt-get install subversion git autoconf g++ libssl-dev
+```
+
+Obtain the latest version of the Nmap source code from the Subversion repository:
+```
+svn checkout https://svn.nmap.org/nmap
+```
+
+Obtain the latest version of the ssl-dh-params script from the Github repository:
+```
+git clone https://github.com/eSentire/nmap-esentire.git
+```
+
+Apply patches to the Nmap source code:
+```
+patch nmap/nse_openssl.cc nmap-esentire/patches/nse_openssl.cc.patch
+patch nmap/nselib/tls.lua nmap-esentire/patches/tls.lua.patch
+patch nmap/nselib/vulns.lua nmap-esentire/patches/vulns.lua.patch
+```
+
+Copy ssl-dh-params script to the scripts directory:
+```
+cp nmap-esentire/scripts/ssl-dh-params.nse nmap/scripts
+```
+
+Build the Nmap source code:
+```
+cd nmap
+./configure
+make
+```
+
+Install the newly-built version of Nmap (to /usr/local/share/nmap):
+```
+sudo make install
+```
 
