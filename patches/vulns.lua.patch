@@ -1,40 +1,27 @@
-Index: vulns.lua
+Index: nselib/vulns.lua
 ===================================================================
---- vulns.lua	(revision 34769)
-+++ vulns.lua	(working copy)
-@@ -1767,7 +1767,11 @@
-   if vuln_field then
-     if type(vuln_field) == "table" then
-       for _, line in ipairs(vuln_field) do
--        tadd(out, stdnse.strsplit("\r?\n", line))
-+				if type(line) == "string" then
-+          tadd(out, stdnse.strsplit("\r?\n", line))
-+				else
-+					insert(out, line)
-+				end
-       end
-     elseif type(vuln_field) == "string" then
-       out = stdnse.strsplit("\r?\n", vuln_field)
-@@ -2242,9 +2246,8 @@
+--- nselib/vulns.lua	(revision 34909)
++++ nselib/vulns.lua	(working copy)
+@@ -2246,9 +2246,8 @@
        for i, vuln_table in ipairs(self.entries.vulns) do
          local vuln_out, out_t = format_vuln_base(vuln_table)
          if type(out_t) == "table" then
 -          for i, v, k in pairs(out_t) do
 -            output_t2[i]=v
 -          end
-+          local ID = vuln_table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
++          local ID = vuln.table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
 +          output_t2[ID] = out_t
          end
          if vuln_out then
            output_table.report = concat(vuln_out, "\n")
-@@ -2265,9 +2268,8 @@
+@@ -2269,9 +2268,8 @@
        for i, vuln_table in ipairs(self.entries.not_vulns) do
          local vuln_out, out_t = format_vuln_base(vuln_table, SHOW_ALL)
          if type(out_t) == "table" then
 -          for i, v, k in pairs(out_t) do
 -            output_t2[i]=v
 -          end
-+          local ID = vuln_table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
++          local ID = vuln.table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
 +          output_t2[ID] = out_t
          end
          if vuln_out then

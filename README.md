@@ -87,7 +87,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 #### Potentially Unsafe Diffie-Hellman Group Parameters
 ```
 |   Diffie-Hellman Key Exchange Potentially Unsafe Group Parameters
-|     State: LIKELY VULNERABLE
+|     State: VULNERABLE
 |       This TLS service appears to be using a modulus that is not a safe prime and does
 |       not correspond to any well-known DSA group for Diffie-Hellman key exchange.
 |       These parameters MAY be secure if:
