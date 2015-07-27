@@ -1,7 +1,7 @@
-Index: tls.lua
+Index: nselib/tls.lua
 ===================================================================
---- tls.lua	(revision 34822)
-+++ tls.lua	(working copy)
+--- nselib/tls.lua	(revision 34822)
++++ nselib/tls.lua	(working copy)
 @@ -1107,12 +1107,14 @@
  
  ---
