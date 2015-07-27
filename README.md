@@ -155,3 +155,49 @@ Install the newly-built version of Nmap (to /usr/local/share/nmap):
 sudo make install
 ```
 
+### Installation Instructions for Windows:
+
+NOTE: This was tested on Windows 7 Professional with Visual Studio 2013 Community Edition.  All paths are relative to the directory from which you execute the instructions.
+
+In order to get started, you will need to install WinPcap (www.winpcap.org), a supported version of Visual Studio, and Subversion for Windows (http://sourceforge.net/projects/win32svn/files/latest/download).
+
+Obtain the Windows dependencies for building Nmap from source code:
+```
+svn checkout https://svn.nmap.org/nmap-mswin32-aux
+```
+
+Obtain the latest version of the Nmap source code from the Subversion repository:
+```
+svn checkout https://svn.nmap.org/nmap
+```
+
+Obtain the latest version of the ssl-dh-params script:
+```
+svn checkout https://github.com/eSentire/nmap-esentire
+```
+
+Apply patches to the Nmap source code:
+```
+svn patch nmap-esentire\trunk\patches\nse_openssl.cc.patch nmap\
+svn patch nmap-esentire\trunk\patches\tls.lua.patch nmap\
+svn patch nmap-esentire\trunk\patches\vulns.lua.patch nmap\
+```
+
+Copy ssl-dh-params script to the scripts directory:
+```
+copy nmap-esentire\trunk\scripts\ssl-dh-params.nse nmap\scripts
+```
+
+Start Visual Studio, and open the solution file:
+```
+nmap\mswin32\nmap.sln
+```
+
+In Configuration Manager, change the active solution configuration to Release, and build the solution.
+
+Once the build is successful, the executable and data files can be found in:
+```
+nmap\mswin32\Release\
+```
+
+You can run Nmap and the script from there.
