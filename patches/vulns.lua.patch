@@ -9,7 +9,7 @@ Index: nselib/vulns.lua
 -          for i, v, k in pairs(out_t) do
 -            output_t2[i]=v
 -          end
-+          local ID = vuln.table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
++          local ID = vuln_table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
 +          output_t2[ID] = out_t
          end
          if vuln_out then
@@ -21,7 +21,7 @@ Index: nselib/vulns.lua
 -          for i, v, k in pairs(out_t) do
 -            output_t2[i]=v
 -          end
-+          local ID = vuln.table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
++          local ID = vuln_table.IDS.CVE or vuln_table.IDS[next(vuln_table.IDS)]
 +          output_t2[ID] = out_t
          end
          if vuln_out then
