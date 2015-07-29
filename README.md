@@ -8,6 +8,8 @@ to Logjam (CVE 2015-4000) and other weaknesses.
 
 Opportunistic STARTTLS sessions are established on services that support them.
 
+For more details, see: http://www2.esentire.com/TLSUnjammedWP
+
 ### Usage:
 
 `nmap --script ssl-dh-params <target>`
