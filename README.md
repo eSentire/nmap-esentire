@@ -181,7 +181,6 @@ Apply patches to the Nmap source code:
 ```
 svn patch nmap-esentire\trunk\patches\nse_openssl.cc.patch nmap\
 svn patch nmap-esentire\trunk\patches\tls.lua.patch nmap\
-svn patch nmap-esentire\trunk\patches\vulns.lua.patch nmap\
 ```
 
 Copy ssl-dh-params script to the scripts directory:
