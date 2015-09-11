@@ -137,7 +137,6 @@ Apply patches to the Nmap source code:
 ```
 patch nmap/nse_openssl.cc nmap-esentire/patches/nse_openssl.cc.patch
 patch nmap/nselib/tls.lua nmap-esentire/patches/tls.lua.patch
-patch nmap/nselib/vulns.lua nmap-esentire/patches/vulns.lua.patch
 ```
 
 Copy ssl-dh-params script to the scripts directory:
