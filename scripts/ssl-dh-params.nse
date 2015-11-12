@@ -592,16 +592,16 @@ local function get_dhe_params(host, port, protocol, ciphers)
 
   -- Keep ClientHello record size below 255 bytes and the number of ciphersuites
   -- to 64 or less in order to avoid implementation issues with some TLS servers
-  local function next_chunk(t, ciphers, pos)
-    local len, room, last
 
-    -- Get handshake record size with just one cipher
-    t.ciphers = { "TLS_NULL_WITH_NULL_NULL" }
-    len = #tls.client_hello(t)
+  -- Get handshake record size with just one cipher
+  t.ciphers = { "TLS_NULL_WITH_NULL_NULL" }
+  local len = #tls.client_hello(t)
+  local room = math.floor(math.max(0, (255 - len) / 2))
+
+  local function next_chunk(t, ciphers, pos)
 
     -- Compute number of ciphers to fit in next chunk
-    room = math.floor(math.max(0, (255 - len) / 2))
-    last = math.min(#ciphers, pos + math.min(63, room))
+    local last = math.min(#ciphers, pos + math.min(63, room))
     t.ciphers = {}
 
     for i = pos, last do
