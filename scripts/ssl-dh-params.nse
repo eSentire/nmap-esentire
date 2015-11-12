@@ -616,6 +616,10 @@ local function get_dhe_params(host, port, protocol, ciphers)
   while pos <= #ciphers do
     pos = next_chunk(t, ciphers, pos)
     local records = get_server_response(host, port, t)
+    if not records then
+      stdnse.debug1("Connection failed")
+      return false
+    end
 
     local alert = records.alert
     if alert then
