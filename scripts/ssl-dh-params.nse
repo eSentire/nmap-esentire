@@ -578,7 +578,9 @@ local function get_server_response(host, port, t)
   end
 end
 
-
+-- If protocol fails (i.e. no ciphers will ever succeed) then returns false
+-- If no ciphers were supported, but the protocol is valid, then returns nil
+-- else returns the cipher and dh params
 local function get_dhe_params(host, port, protocol, ciphers)
   local cipher, packed
   local t = {}
@@ -619,6 +621,10 @@ local function get_dhe_params(host, port, protocol, ciphers)
     if alert then
       for j = 1, #alert.body do
         ctx_log(2, protocol, "Received alert: %s", alert.body[j].description)
+        if alert["protocol"] ~= protocol then
+          ctx_log(1, protocol, "Protocol rejected.")
+          return false
+        end
       end
     end
 
@@ -627,6 +633,10 @@ local function get_dhe_params(host, port, protocol, ciphers)
     if handshake then
       for j = 1, #handshake.body do
         if handshake.body[j].type == "server_hello" then
+          if handshake.body[j].protocol ~= protocol then
+            ctx_log(1, protocol, "Protocol rejected in server hello")
+            return false
+          end
           cipher = handshake.body[j].cipher
         elseif handshake.body[j].type == "server_key_exchange" then
           packed = handshake.body[j].data
@@ -836,6 +846,8 @@ Additional testing may be required to verify the security of these parameters.]]
   for protocol in pairs(tls.PROTOCOLS) do
     -- Try anonymous DH ciphersuites
     cipher, dhparams = get_dhe_params(host, port, protocol, dh_anons)
+    -- Explicit test for false needed because nil just means no ciphers supported.
+    if cipher == false then goto NEXT_PROTOCOL end
     if dhparams and not anons[dhparams.p] then
       vuln_table_anondh.state = vulns.STATE.VULN
       check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
@@ -855,6 +867,7 @@ Additional testing may be required to verify the security of these parameters.]]
       check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
       primes[dhparams.p] = 1
     end
+    ::NEXT_PROTOCOL::
   end
 
   local report = vulns.Report:new(SCRIPT_NAME, host, port)
