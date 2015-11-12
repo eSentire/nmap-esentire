@@ -52,21 +52,42 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- |       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4000
 -- |       http://osvdb.org/122331
 -- |
--- |   Diffie-Hellman Key Exchange Discrete Logarithm Precomputation Vulnerability
+-- |   Diffie-Hellman Key Exchange Insufficient Diffie-Hellman Group Strength
 -- |     State: VULNERABLE
--- |       Transport Layer Security (TLS) services that use one of a few commonly shared
--- |       Diffie-Hellman groups of insufficient size may be susceptible to passive
--- |       eavesdropping from an attacker with nation-state resources.
+-- |       Transport Layer Security (TLS) services that use Diffie-Hellman groups of
+-- |       insuffficient strength, especially those using one of a few commonly shared
+-- |       groups, may be susceptible to passive eavesdropping attacks.
 -- |     Check results:
--- |       WELL-KNOWN DH GROUP 1
--- |         Ciphersuite: TLS_DHE_RSA_WITH_DES_CBC_SHA
--- |         Modulus Type: Non-safe prime
--- |         Modulus Source: sun.security.provider/768-bit DSA group with 160-bit prime order subgroup
--- |         Modulus Length: 768 bits
--- |         Generator Length: 768 bits
--- |         Public Key Length: 768 bits
+-- |       WEAK DH GROUP 1
+-- |         Ciphersuite: TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+-- |         Modulus Type: Safe prime
+-- |         Modulus Source: Unknown/Custom-generated
+-- |         Modulus Length: 512 bits
+-- |         Generator Length: 8 bits
+-- |         Public Key Length: 512 bits
 -- |     References:
--- |_      https://weakdh.org
+-- |       https://weakdh.org
+-- |
+-- |   Diffie-Hellman Key Exchange Potentially Unsafe Group Parameters
+-- |     State: VULNERABLE
+-- |       This TLS service appears to be using a modulus that is not a safe prime and does
+-- |       not correspond to any well-known DSA group for Diffie-Hellman key exchange.
+-- |       These parameters MAY be secure if:
+-- |       - They were generated according to the procedure described in FIPS 186-4 for
+-- |         DSA Domain Parameter Generation, or
+-- |       - The generator g generates a subgroup of large prime order
+-- |       Additional testing may be required to verify the security of these parameters.
+-- |     Check results:
+-- |       NON-SAFE DH GROUP 1
+-- |         Cipher Suite: TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+-- |         Modulus Type: Non-safe prime
+-- |         Modulus Source: Unknown/Custom-generated
+-- |         Modulus Length: 1024 bits
+-- |         Generator Length: 1024 bits
+-- |         Public Key Length: 1024 bits
+-- |     References:
+-- |       https://weakdh.org
+-- |_      http://www2.esentire.com/TLSUnjammedWP
 
 author = "Jacob Gajek"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
@@ -837,7 +858,8 @@ These parameters MAY be secure if:
 Additional testing may be required to verify the security of these parameters.]],
     state = vulns.STATE.NOT_VULN,
     references = {
-      "https://weakdh.org"
+      "https://weakdh.org",
+      "http://www2.esentire.com/TLSUnjammedWP"
     }
   }
 
