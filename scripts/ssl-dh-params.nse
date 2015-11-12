@@ -677,30 +677,26 @@ local function get_dhe_ciphers()
   return dh_anons, dhe_ciphers, dhe_exports
 end
 
-
-if have_ssl then
-  metatable = {
-    __tostring = 
-      function(g)
-        return string.format("%s\n      Cipher Suite: %s\n      Modulus Type: " ..
-                             "%s\n      Modulus Source: %s\n      Modulus Length: " ..
-                             "%s bits\n      Generator Length: %s bits\n      " ..
-                             "Public Key Length: %s bits",
-                             g.Label, g.Cipher, g.Class, g.Source, g.Length, g.GenLen, g.PubKeyLen)
+local fields_order = {
+  "Cipher Suite",
+  "Modulus Type",
+  "Modulus Source",
+  "Modulus Length",
+  "Generator Length",
+  "Public Key Length",
+}
+local group_metatable = {
+  __tostring = function(g)
+    local out = {}
+    for i=1, #fields_order do
+      local k = fields_order[i]
+      if g[k] then
+        out[#out+1] = ("      %s: %s"):format(k, g[k])
       end
-  }
-else
-  metatable = {
-    __tostring =
-      function(g)
-        return string.format("%s\n      Cipher Suite: %s\n      Modulus Source: " ..
-                             "%s\n      Modulus Length: %s bits\n      Generator " ..
-                             "Length: %s bits\n      Public Key Length: %s bits",
-                             g.Label, g.Cipher, g.Source, g.Length, g.GenLen, g.PubKeyLen)
-      end
-  }
-end
-
+    end
+    return table.concat(out, "\n")
+  end
+}
 
 local function check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
   local source = DHE_PRIMES[dhparams.p]
@@ -713,46 +709,37 @@ local function check_dhgroup(anondh, logjam, weakdh, nosafe, cipher, dhparams)
   local is_prime, is_safe
 
   local group = {
-    ["Cipher"] = cipher,
-    ["Source"] = source or "Unknown/Custom-generated",
-    ["Length"] = length,
+    ["Cipher Suite"] = cipher,
+    ["Modulus Source"] = source or "Unknown/Custom-generated",
+    ["Modulus Length"] = length,
     ["Modulus"] = modulus,
-    ["GenLen"] = genlen,
+    ["Generator Length"] = genlen,
     ["Generator"] = generator,
-    ["PubKeyLen"] = pubkeylen
+    ["Public Key Length"] = pubkeylen
   }
+  setmetatable(group, group_metatable)
 
   if have_ssl then
     local bn = openssl.bignum_bin2bn(dhparams.p)
-    is_prime, is_safe = openssl.bignum_is_safe_prime(bn)
-    group["Class"] = (is_safe and "Safe prime") or
+    is_safe, is_prime = openssl.bignum_is_safe_prime(bn)
+    group["Modulus Type"] = (is_safe and "Safe prime") or
                      (is_prime and "Non-safe prime") or
                      "Composite"
   end
 
   if string.find(cipher, "DH_anon") then
-    group["Label"] = ("ANONYMOUS DH GROUP %d"):format(#anondh + 1)
-    setmetatable(group, metatable)
     anondh[#anondh + 1] = group
   elseif string.find(cipher, "EXPORT") then
-    group["Label"] = ("EXPORT-GRADE DH GROUP %d"):format(#logjam + 1)
-    setmetatable(group, metatable)
     logjam[#logjam + 1] = group
   elseif length <= 1024 then
-    group["Label"] = ("WEAK DH GROUP %d"):format(#weakdh + 1)
-    setmetatable(group, metatable)
     weakdh[#weakdh + 1] = group
   end
 
   -- The use of non-safe primes requires carefully generated parameters
   -- in order to be secure. Do some rudimentary validation checks here.
   if have_ssl and not is_safe and not DSA_PARAMS[dhparams.p] then
-    group["Label"] = ("NON-SAFE GROUP %d"):format(#nosafe + 1)
-    setmetatable(group, metatable)
     nosafe[#nosafe + 1] = group
   elseif DSA_PARAMS[dhparams.p] and DSA_PARAMS[dhparams.p] ~= dhparams.g then
-    group["Label"] = ("NON-SAFE GROUP %d"):format(#nosafe + 1)
-    setmetatable(group, metatable)
     nosafe[#nosafe + 1] = group
   end
 end
@@ -762,6 +749,13 @@ portrule = function(host, port)
   return shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port)
 end
 
+local function format_check(t, label)
+  local out = {}
+  for i, v in ipairs(t) do
+    out[i] = string.format("%s %d\n%s", label, i, v)
+  end
+  return out
+end
 
 action = function(host, port)
   local dh_anons, dhe_ciphers, dhe_exports = get_dhe_ciphers()
@@ -872,10 +866,10 @@ Additional testing may be required to verify the security of these parameters.]]
 
   local report = vulns.Report:new(SCRIPT_NAME, host, port)
 
-  vuln_table_anondh.check_results = anondh
-  vuln_table_logjam.check_results = logjam
-  vuln_table_weakdh.check_results = weakdh
-  vuln_table_nosafe.check_results = nosafe
+  vuln_table_anondh.check_results = format_check(anondh, "ANONYMOUS DH GROUP")
+  vuln_table_logjam.check_results = format_check(logjam, "EXPORT-GRADE DH GROUP")
+  vuln_table_weakdh.check_results = format_check(weakdh, "WEAK DH GROUP")
+  vuln_table_nosafe.check_results = format_check(nosafe, "NON-SAFE GROUP")
 
   if #anondh > 0 then
     vuln_table_anondh.state = vulns.STATE.VULN
