@@ -133,11 +133,6 @@ Obtain the latest version of the ssl-dh-params script from the Github repository
 git clone https://github.com/eSentire/nmap-esentire.git
 ```
 
-Apply patch to the Nmap source code:
-```
-patch nmap/nse_openssl.cc nmap-esentire/patches/nse_openssl.cc.patch
-```
-
 Copy ssl-dh-params script to the scripts directory:
 ```
 cp nmap-esentire/scripts/ssl-dh-params.nse nmap/scripts
@@ -174,11 +169,6 @@ svn checkout https://svn.nmap.org/nmap
 Obtain the latest version of the ssl-dh-params script:
 ```
 svn checkout https://github.com/eSentire/nmap-esentire
-```
-
-Apply patch to the Nmap source code:
-```
-svn patch nmap-esentire\trunk\patches\nse_openssl.cc.patch nmap\
 ```
 
 Copy ssl-dh-params script to the scripts directory:
